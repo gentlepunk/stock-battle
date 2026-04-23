@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>주식 수익률 대회</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" />
+  <script src="data.js" onerror="window._dataJsError=true"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0f1117;
+      --surface: #1a1d27;
+      --surface2:#12141f;
+      --border:  #2a2d3e;
+      --text:    #e2e8f0;
+      --muted:   #8892a4;
+      --green:   #22c55e;
+      --red:     #ef4444;
+      --gold:    #f59e0b;
+      --silver:  #94a3b8;
+      --bronze:  #cd7c2f;
+    }
+
+    html { font-size: 16px; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+      min-height: 100vh;
+      padding-bottom: 40px;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    /* ── 헤더 ── */
+    header {
+      padding: 24px 16px 18px;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 18px;
+    }
+
+    header h1 {
+      font-family: 'Black Han Sans', sans-serif;
+      font-size: 1.65rem;
+      letter-spacing: 0.3px;
+    }
+
+    .header-meta {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .meta-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 5px 13px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      min-height: 32px;
+    }
+
+    .meta-badge.accent {
+      border-color: var(--gold);
+      color: var(--gold);
+    }
+
+    /* ── 카드 영역 ── */
+    .cards-section {
+      padding: 0 12px;
+      margin-bottom: 18px;
+    }
+
+    /* 1위: 전체 너비, 골드 강조 */
+    .card-first {
+      background: var(--surface);
+      border: 2px solid var(--gold);
+      border-radius: 18px;
+      padding: 18px 18px 16px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .card-first .c-rank {
+      font-size: 2.6rem;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .card-first .c-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .card-first .c-name {
+      font-family: 'Black Han Sans', sans-serif;
+      font-size: 1.15rem;
+    }
+
+    .card-first .c-stock {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .card-first .c-right {
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .card-first .c-pct {
+      font-family: 'Black Han Sans', sans-serif;
+      font-size: 2rem;
+      line-height: 1;
+    }
+
+    .card-first .c-pl {
+      font-size: 0.83rem;
+      margin-top: 5px;
+    }
+
+    /* 2~4위: 3열 그리드 */
+    .card-rest-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .card-rest {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 8px 12px;
+      text-align: center;
+    }
+
+    .card-rest.r2 { border-color: var(--silver); }
+    .card-rest.r3 { border-color: var(--bronze); }
+
+    .card-rest .c-rank {
+      font-size: 1.5rem;
+      margin-bottom: 6px;
+      line-height: 1;
+    }
+
+    .card-rest .c-name {
+      font-family: 'Black Han Sans', sans-serif;
+      font-size: 0.95rem;
+    }
+
+    .card-rest .c-stock {
+      font-size: 0.68rem;
+      color: var(--muted);
+      margin-top: 2px;
+      margin-bottom: 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding: 0 4px;
+    }
+
+    .card-rest .c-pct {
+      font-family: 'Black Han Sans', sans-serif;
+      font-size: 1.75rem; /* 28px */
+      line-height: 1;
+    }
+
+    .card-rest .c-pl {
+      font-size: 0.7rem;
+      margin-top: 4px;
+    }
+
+    /* 수익률 색상 */
+    .up   { color: var(--green); }
+    .down { color: var(--red); }
+    .even { color: var(--muted); }
+
+    /* ── 차트 영역 ── */
+    .chart-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      margin: 0 12px 18px;
+      padding: 16px 14px 14px;
+    }
+
+    .section-title {
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-weight: 500;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    /* 범례: 1행 */
+    .chart-legend {
+      display: flex;
+      flex-direction: row;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .legend-name {
+      font-weight: 700;
+      font-size: 0.88rem;
+    }
+
+    .chart-canvas-wrapper {
+      position: relative;
+      height: 280px;
+    }
+
+    /* ── 상세 현황 ── */
+    .table-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      margin: 0 12px;
+      overflow: hidden;
+    }
+
+    .table-section .section-title {
+      padding: 14px 14px 4px;
+    }
+
+    .detail-row {
+      padding: 14px 14px 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    .detail-row:active { background: #1e2130; }
+
+    .detail-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .d-rank  { font-size: 1.5rem; line-height: 1; flex-shrink: 0; }
+
+    .d-meta  { flex: 1; min-width: 0; }
+
+    .d-name  {
+      font-family: 'Black Han Sans', sans-serif;
+      font-size: 1rem;
+      display: block;
+    }
+
+    .d-stock {
+      font-size: 0.75rem;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
+      margin-top: 1px;
+    }
+
+    .d-pct {
+      font-family: 'Black Han Sans', sans-serif;
+      font-size: 1.5rem;
+      line-height: 1;
+      flex-shrink: 0;
+      text-align: right;
+    }
+
+    .detail-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px 12px;
+      padding-left: 2px;
+    }
+
+    .stat {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+    }
+
+    .stat-label {
+      color: var(--muted);
+      font-size: 0.72rem;
+    }
+
+    .stat-val {
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+<!-- 헤더 -->
+<header>
+  <h1>📈 주식 수익률 대회</h1>
+  <div class="header-meta">
+    <span class="meta-badge accent" id="daysLeft">—</span>
+    <span class="meta-badge" id="lastUpdate">—</span>
+  </div>
+</header>
+
+<!-- 순위 카드 -->
+<div class="cards-section">
+  <div id="cardFirst"></div>
+  <div class="card-rest-grid" id="cardRest"></div>
+</div>
+
+<!-- 차트 -->
+<div class="chart-section">
+  <div class="section-title">수익률 추이</div>
+  <div class="chart-legend" id="chartLegend"></div>
+  <div class="chart-canvas-wrapper">
+    <canvas id="lineChart"></canvas>
+  </div>
+</div>
+
+<!-- 상세 현황 -->
+<div class="table-section">
+  <div class="section-title">상세 현황</div>
+  <div id="detailList"></div>
+</div>
+
+<script>
+const COLORS = {
+  YR: "#6366f1",
+  DG: "#22c55e",
+  KM: "#f59e0b",
+  HJ: "#ec4899",
+};
+
+const RANK_EMOJI = ["🥇", "🥈", "🥉", "4️⃣"];
+const END_DATE   = new Date("2026-05-15T23:59:59+09:00");
+const START_DATE = new Date("2026-04-15T00:00:00+09:00");
+
+async function loadData() {
+  if (typeof STOCK_DATA !== "undefined") return STOCK_DATA;
+  const res = await fetch(`data.json?_=${Date.now()}`);
+  return res.json();
+}
+
+function cls(v) {
+  return v > 0 ? "up" : v < 0 ? "down" : "even";
+}
+
+function sign(v) {
+  return v > 0 ? "+" : "";
+}
+
+function fmt(n, d = 0) {
+  return n.toLocaleString("ko-KR", {
+    minimumFractionDigits: d,
+    maximumFractionDigits: d,
+  });
+}
+
+function dayLabel(dateStr) {
+  const diff = Math.round(
+    (new Date(dateStr) - START_DATE) / (1000 * 60 * 60 * 24)
+  );
+  return `D+${diff + 1}`;
+}
+
+function render(data) {
+  const { participants, prices } = data;
+  const dates = Object.keys(prices).sort();
+
+  // 최신 수익률 계산
+  const latest = {};
+  for (const [pid, info] of Object.entries(participants)) {
+    const lastDate = [...dates].reverse().find(d => prices[d][pid] != null);
+    if (lastDate) {
+      const cur = prices[lastDate][pid];
+      const pct = (cur - info.avg_price) / info.avg_price * 100;
+      const pl  = (cur - info.avg_price) * info.shares;
+      latest[pid] = { cur, pct, pl };
+    } else {
+      latest[pid] = { cur: null, pct: null, pl: null };
+    }
+  }
+
+  const ranked = Object.keys(participants)
+    .filter(p => latest[p].pct != null)
+    .sort((a, b) => latest[b].pct - latest[a].pct);
+
+  // ── 헤더 메타 ──
+  const now = new Date();
+  const daysLeft = Math.ceil((END_DATE - now) / (1000 * 60 * 60 * 24));
+  document.getElementById("daysLeft").textContent =
+    daysLeft > 0 ? `⏱ 종료까지 ${daysLeft}일` : "🏁 대회 종료";
+
+  const lastDate = dates.at(-1) ?? "—";
+  document.getElementById("lastUpdate").textContent = `🕐 ${lastDate} 업데이트`;
+
+  // ── 1위 카드 ──
+  const [first] = ranked;
+  const fi = participants[first];
+  const fl = latest[first];
+  document.getElementById("cardFirst").innerHTML = `
+    <div class="card-first">
+      <div class="c-rank">🥇</div>
+      <div class="c-info">
+        <div class="c-name">${first}</div>
+        <div class="c-stock">${fi.stock}</div>
+      </div>
+      <div class="c-right">
+        <div class="c-pct ${cls(fl.pct)}">${sign(fl.pct)}${fmt(fl.pct, 2)}%</div>
+        <div class="c-pl  ${cls(fl.pct)}">${sign(fl.pct)}${fmt(fl.pl)}원</div>
+      </div>
+    </div>
+  `;
+
+  // ── 2~4위 카드 ──
+  const restEl = document.getElementById("cardRest");
+  restEl.innerHTML = "";
+  ranked.slice(1).forEach((pid, i) => {
+    const info = participants[pid];
+    const l = latest[pid];
+    const rankNum = i + 2;
+    const div = document.createElement("div");
+    div.className = `card-rest r${rankNum}`;
+    div.innerHTML = `
+      <div class="c-rank">${RANK_EMOJI[i + 1]}</div>
+      <div class="c-name">${pid}</div>
+      <div class="c-stock">${info.stock}</div>
+      <div class="c-pct ${cls(l.pct)}">${sign(l.pct)}${fmt(l.pct, 2)}%</div>
+      <div class="c-pl  ${cls(l.pct)}">${sign(l.pct)}${fmt(l.pl)}원</div>
+    `;
+    restEl.appendChild(div);
+  });
+
+  // ── 커스텀 범례 (차트 위, 2열) ──
+  document.getElementById("chartLegend").innerHTML = ranked.map(pid => {
+    const l = latest[pid];
+    return `
+      <div class="legend-item">
+        <span class="legend-dot" style="background:${COLORS[pid]}"></span>
+        <span class="legend-name">${pid}</span>
+      </div>
+    `;
+  }).join("");
+
+  // ── 꺾은선 차트 ──
+  const datasets = Object.keys(participants).map(pid => {
+    const info = participants[pid];
+    return {
+      label: pid,
+      data: dates.map(d => {
+        const p = prices[d]?.[pid];
+        return p != null ? +((p - info.avg_price) / info.avg_price * 100).toFixed(2) : null;
+      }),
+      borderColor: COLORS[pid],
+      backgroundColor: COLORS[pid] + "22",
+      tension: 0.35,
+      pointRadius: 5,
+      pointHoverRadius: 7,
+      fill: false,
+      spanGaps: true,
+    };
+  });
+
+  const ctx = document.getElementById("lineChart").getContext("2d");
+  if (window._chart) window._chart.destroy();
+  window._chart = new Chart(ctx, {
+    type: "line",
+    data: { labels: dates.map(dayLabel), datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: c => ` ${c.dataset.label}: ${c.parsed.y >= 0 ? "+" : ""}${c.parsed.y}%`
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: "#8892a4", font: { size: 11 } },
+          grid:  { color: "#1e2130" }
+        },
+        y: {
+          ticks: {
+            color: "#8892a4",
+            font: { size: 11 },
+            callback: v => (v >= 0 ? "+" : "") + v + "%"
+          },
+          grid: { color: "#1e2130" }
+        }
+      }
+    }
+  });
+
+  // ── 상세 현황 ──
+  const detailList = document.getElementById("detailList");
+  detailList.innerHTML = "";
+  ranked.forEach((pid, i) => {
+    const info = participants[pid];
+    const { cur, pct, pl } = latest[pid];
+    const div = document.createElement("div");
+    div.className = "detail-row";
+    div.innerHTML = `
+      <div class="detail-header">
+        <span class="d-rank">${RANK_EMOJI[i]}</span>
+        <span class="d-meta">
+          <span class="d-name">${pid}</span>
+          <span class="d-stock">${info.stock}</span>
+        </span>
+        <span class="d-pct ${cls(pct)}">${sign(pct)}${fmt(pct, 2)}%</span>
+      </div>
+      <div class="detail-stats">
+        <div class="stat">
+          <span class="stat-label">평단가</span>
+          <span class="stat-val">${fmt(info.avg_price)}원</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">현재가</span>
+          <span class="stat-val">${fmt(cur)}원</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">보유 주수</span>
+          <span class="stat-val">${info.shares}주</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">수익금액</span>
+          <span class="stat-val ${cls(pct)}">${sign(pct)}${fmt(pl)}원</span>
+        </div>
+      </div>
+    `;
+    detailList.appendChild(div);
+  });
+}
+
+loadData()
+  .then(render)
+  .catch(err => {
+    console.error(err);
+    document.getElementById("cardFirst").innerHTML =
+      `<p style="color:var(--red);padding:20px 16px">데이터를 불러오지 못했습니다. data.json을 확인하세요.</p>`;
+  });
+</script>
+</body>
+</html>
