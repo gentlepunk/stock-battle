@@ -1,3 +1,4 @@
+import re
 import requests
 from bs4 import BeautifulSoup
 import json
@@ -6,7 +7,9 @@ from datetime import datetime, timezone, timedelta
 
 # 한국 시간대 (UTC+9)
 KST = timezone(timedelta(hours=9))
-today = datetime.now(KST).strftime("%Y-%m-%d")
+now_kst = datetime.now(KST)
+today = now_kst.strftime("%Y-%m-%d")
+today_naver = now_kst.strftime("%Y.%m.%d")  # 네이버 날짜 형식
 
 BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(BASE_DIR, "data.json")
@@ -19,42 +22,109 @@ HEADERS = {
     )
 }
 
+MARKET_OPEN  = now_kst.replace(hour=9,  minute=0,  second=0, microsecond=0)
+MARKET_CLOSE = now_kst.replace(hour=15, minute=30, second=0, microsecond=0)
+
+
+def is_market_open() -> bool:
+    """평일 09:00~15:30 KST 사이면 True"""
+    if now_kst.weekday() >= 5:  # 토·일
+        return False
+    return MARKET_OPEN <= now_kst <= MARKET_CLOSE
+
 
 def get_current_price(code: str) -> int | None:
-    """네이버 증권에서 현재가 크롤링"""
+    """네이버 증권 main 페이지에서 현재가 크롤링 (장중 전용)"""
     url = f"https://finance.naver.com/item/main.naver?code={code}"
     try:
         resp = requests.get(url, headers=HEADERS, timeout=10)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        # 현재가: <p class="no_today"> 안의 em 태그에서 숫자 텍스트만 추출
-        price_tag = soup.select_one("p.no_today em.no_up, p.no_today em.no_down, p.no_today em.no_same")
+        price_tag = soup.select_one(
+            "p.no_today em.no_up, p.no_today em.no_down, p.no_today em.no_same"
+        )
         if price_tag:
-            # .strings 이터레이터로 개별 텍스트 노드 순회 → 첫 번째 숫자 토큰 사용
             for text in price_tag.strings:
                 clean = text.strip().replace(",", "")
                 if clean.isdigit():
                     return int(clean)
 
-        # 대체: 페이지 전체에서 정규식으로 현재가 추출
-        import re
-        m = re.search(r'var\s+naver_stock_speed2_time[^;]+현재가["\s:]+([0-9,]+)', resp.text)
-        if not m:
-            m = re.search(r'"now"\s*:\s*"?([0-9,]+)"?', resp.text)
+        m = re.search(r'"now"\s*:\s*"?([0-9,]+)"?', resp.text)
         if m:
             return int(m.group(1).replace(",", ""))
 
     except Exception as e:
-        print(f"  [오류] {code} 크롤링 실패: {e}")
+        print(f"  [오류] {code} 현재가 크롤링 실패: {e}")
     return None
+
+
+def get_closing_price(code: str) -> tuple:
+    """네이버 증권 일별 시세에서 종가 크롤링 (장 마감 후 전용).
+    오늘 종가가 있으면 오늘 종가, 없으면 가장 최근 거래일 종가 반환.
+    반환값: (가격, 실제날짜) 또는 (None, None)
+    """
+    url = f"https://finance.naver.com/item/sise_day.naver?code={code}"
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=10)
+        resp.raise_for_status()
+        resp.encoding = "euc-kr"
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        date_pat = re.compile(r"^\d{4}\.\d{2}\.\d{2}$")
+        first_valid = None
+
+        for row in soup.select("table.type2 tr"):
+            tds = row.find_all("td")
+            if len(tds) < 2:
+                continue
+
+            date_text = tds[0].get_text(strip=True)
+            if not date_pat.match(date_text):
+                continue
+
+            close_text = tds[1].get_text(strip=True).replace(",", "")
+            if not close_text.isdigit():
+                continue
+
+            price = int(close_text)
+
+            if first_valid is None:
+                first_valid = (price, date_text)
+
+            if date_text == today_naver:
+                return price, date_text
+
+        if first_valid:
+            return first_valid
+
+    except Exception as e:
+        print(f"  [오류] {code} 종가 크롤링 실패: {e}")
+
+    return None, None
+
+
+def fetch_price(code: str) -> tuple:
+    """장중이면 현재가, 장 마감 후면 종가를 반환.
+    반환값: (가격, 레이블) 또는 (None, None)
+    """
+    if is_market_open():
+        price = get_current_price(code)
+        return (price, "현재가") if price is not None else (None, None)
+    else:
+        price, trade_date = get_closing_price(code)
+        if price is None:
+            return None, None
+        label = "종가" if trade_date == today_naver else f"종가(기준:{trade_date})"
+        return price, label
 
 
 def main():
     with open(DATA_FILE, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    print(f"\n[{today}] 종가 업데이트 시작")
+    mode = "장중 (현재가)" if is_market_open() else "장 마감 후 (종가)"
+    print(f"\n[{today}] 업데이트 시작 - {mode}")
     print("-" * 40)
 
     if today not in data["prices"]:
@@ -62,13 +132,13 @@ def main():
 
     for pid, info in data["participants"].items():
         code = info["code"]
-        price = get_current_price(code)
+        price, label = fetch_price(code)
         if price is not None:
             data["prices"][today][pid] = price
             avg = info["avg_price"]
             pct = (price - avg) / avg * 100
             sign = "+" if pct >= 0 else ""
-            print(f"  {pid} ({info['stock']}): {price:,}원  수익률 {sign}{pct:.2f}%")
+            print(f"  {pid} ({info['stock']}): {price:,}원 [{label}]  수익률 {sign}{pct:.2f}%")
         else:
             print(f"  {pid} ({info['stock']}): 가져오기 실패")
 
