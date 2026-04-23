@@ -367,7 +367,7 @@ const START_DATE = new Date("2026-04-15T00:00:00+09:00");
 
 async function loadData() {
   if (typeof STOCK_DATA !== "undefined") return STOCK_DATA;
-  const res = await fetch(`data.json?_=${Date.now()}`);
+  const res = await fetch('data.json?v=' + Date.now());
   return res.json();
 }
 
