@@ -10,7 +10,6 @@ today = datetime.now(KST).strftime("%Y-%m-%d")
 
 BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(BASE_DIR, "data.json")
-JS_FILE   = os.path.join(BASE_DIR, "data.js")
 
 HEADERS = {
     "User-Agent": (
@@ -76,14 +75,8 @@ def main():
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-    # data.js 생성 (file:// 로컬 열람용 — script 태그는 CORS 제한 없음)
-    with open(JS_FILE, "w", encoding="utf-8") as f:
-        f.write("const STOCK_DATA = ")
-        json.dump(data, f, ensure_ascii=False, indent=2)
-        f.write(";\n")
-
     print("-" * 40)
-    print("data.json / data.js 업데이트 완료\n")
+    print("data.json 업데이트 완료\n")
 
 
 if __name__ == "__main__":
