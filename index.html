@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>주식 수익률 대회</title>
+  <title>미국 주식 수익률 대회</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -324,7 +324,7 @@
 
 <!-- 헤더 -->
 <header>
-  <h1>📈 주식 수익률 대회</h1>
+  <h1>📈 미국 주식 수익률 대회</h1>
   <div class="header-meta">
     <span class="meta-badge accent" id="daysLeft">—</span>
     <span class="meta-badge" id="lastUpdate">—</span>
@@ -361,8 +361,8 @@ const COLORS = {
 };
 
 const RANK_EMOJI = ["🥇", "🥈", "🥉", "4️⃣"];
-const END_DATE   = new Date("2026-05-15T23:59:59+09:00");
-const START_DATE = new Date("2026-04-15T00:00:00+09:00");
+const END_DATE   = new Date("2026-07-31T23:59:59-04:00");
+const START_DATE = new Date("2026-06-29T00:00:00");
 
 async function loadData() {
   const res = await fetch('data.json?v=' + Date.now());
@@ -377,10 +377,19 @@ function sign(v) {
   return v > 0 ? "+" : "";
 }
 
-function fmt(n, d = 0) {
-  return n.toLocaleString("ko-KR", {
+function fmt(n, d = 2) {
+  return n.toLocaleString("en-US", {
     minimumFractionDigits: d,
     maximumFractionDigits: d,
+  });
+}
+
+function fmtUSD(n) {
+  const abs = Math.abs(n);
+  const prefix = n > 0 ? "+$" : n < 0 ? "-$" : "$";
+  return prefix + abs.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
 }
 
@@ -435,7 +444,7 @@ function render(data) {
       </div>
       <div class="c-right">
         <div class="c-pct ${cls(fl.pct)}">${sign(fl.pct)}${fmt(fl.pct, 2)}%</div>
-        <div class="c-pl  ${cls(fl.pct)}">${sign(fl.pct)}${fmt(fl.pl)}원</div>
+        <div class="c-pl  ${cls(fl.pct)}">${fmtUSD(fl.pl)}</div>
       </div>
     </div>
   `;
@@ -454,7 +463,7 @@ function render(data) {
       <div class="c-name">${pid}</div>
       <div class="c-stock">${info.stock}</div>
       <div class="c-pct ${cls(l.pct)}">${sign(l.pct)}${fmt(l.pct, 2)}%</div>
-      <div class="c-pl  ${cls(l.pct)}">${sign(l.pct)}${fmt(l.pl)}원</div>
+      <div class="c-pl  ${cls(l.pct)}">${fmtUSD(l.pl)}</div>
     `;
     restEl.appendChild(div);
   });
@@ -543,11 +552,11 @@ function render(data) {
       <div class="detail-stats">
         <div class="stat">
           <span class="stat-label">평단가</span>
-          <span class="stat-val">${fmt(info.avg_price)}원</span>
+          <span class="stat-val">$${fmt(info.avg_price)}</span>
         </div>
         <div class="stat">
           <span class="stat-label">현재가</span>
-          <span class="stat-val">${fmt(cur)}원</span>
+          <span class="stat-val">$${fmt(cur)}</span>
         </div>
         <div class="stat">
           <span class="stat-label">보유 주수</span>
@@ -555,7 +564,7 @@ function render(data) {
         </div>
         <div class="stat">
           <span class="stat-label">수익금액</span>
-          <span class="stat-val ${cls(pct)}">${sign(pct)}${fmt(pl)}원</span>
+          <span class="stat-val ${cls(pct)}">${fmtUSD(pl)}</span>
         </div>
       </div>
     `;
