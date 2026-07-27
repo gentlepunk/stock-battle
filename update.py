@@ -137,14 +137,17 @@ def get_current_price_us(ticker: str) -> float | None:
 
 def get_closing_price_us(ticker: str) -> tuple:
     """장 마감 후 최신 종가 조회 (yfinance history).
+    Yahoo가 클라우드 IP(GitHub Actions 등)에는 간헐적으로 당일 종가를 NaN으로
+    내려주는 경우가 있어, NaN이 아닌 가장 최근 종가를 사용한다.
     반환값: (가격, 날짜) 또는 (None, None)
     """
     try:
         t = yf.Ticker(ticker)
         hist = t.history(period="5d")
-        if not hist.empty:
-            price = round(float(hist["Close"].iloc[-1]), 2)
-            date  = hist.index[-1].strftime("%Y-%m-%d")
+        closes = hist["Close"].dropna()
+        if not closes.empty:
+            price = round(float(closes.iloc[-1]), 2)
+            date  = closes.index[-1].strftime("%Y-%m-%d")
             return price, date
     except Exception as e:
         print(f"  [오류] {ticker} 종가 조회 실패: {e}")
