@@ -324,7 +324,7 @@
 
 <!-- 헤더 -->
 <header>
-  <h1>📈 미국 주식 수익률 대회</h1>
+  <h1 id="pageTitle">📈 미국 주식 수익률 대회</h1>
   <div class="header-meta">
     <span class="meta-badge accent" id="daysLeft">—</span>
     <span class="meta-badge" id="lastUpdate">—</span>
@@ -377,20 +377,31 @@ function sign(v) {
   return v > 0 ? "+" : "";
 }
 
+let MARKET = "US"; // data.json의 market 값으로 로딩 시 갱신됨
+
 function fmt(n, d = 2) {
-  return n.toLocaleString("en-US", {
-    minimumFractionDigits: d,
-    maximumFractionDigits: d,
+  const locale = MARKET === "KR" ? "ko-KR" : "en-US";
+  const digits = MARKET === "KR" ? 0 : d;
+  return n.toLocaleString(locale, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
   });
 }
 
-function fmtUSD(n) {
+function fmtMoney(n) {
+  if (MARKET === "KR") {
+    return sign(n) + fmt(n) + "원";
+  }
   const abs = Math.abs(n);
   const prefix = n > 0 ? "+$" : n < 0 ? "-$" : "$";
   return prefix + abs.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+function fmtPrice(n) {
+  return MARKET === "KR" ? `${fmt(n)}원` : `$${fmt(n)}`;
 }
 
 function dayLabel(dateStr) {
@@ -403,6 +414,11 @@ function dayLabel(dateStr) {
 function render(data) {
   const { participants, prices } = data;
   const dates = Object.keys(prices).sort();
+
+  MARKET = data.market || "US";
+  const marketName = MARKET === "KR" ? "한국" : "미국";
+  document.title = `${marketName} 주식 수익률 대회`;
+  document.getElementById("pageTitle").textContent = `📈 ${marketName} 주식 수익률 대회`;
 
   // 최신 수익률 계산
   const latest = {};
@@ -444,7 +460,7 @@ function render(data) {
       </div>
       <div class="c-right">
         <div class="c-pct ${cls(fl.pct)}">${sign(fl.pct)}${fmt(fl.pct, 2)}%</div>
-        <div class="c-pl  ${cls(fl.pct)}">${fmtUSD(fl.pl)}</div>
+        <div class="c-pl  ${cls(fl.pct)}">${fmtMoney(fl.pl)}</div>
       </div>
     </div>
   `;
@@ -463,7 +479,7 @@ function render(data) {
       <div class="c-name">${pid}</div>
       <div class="c-stock">${info.stock}</div>
       <div class="c-pct ${cls(l.pct)}">${sign(l.pct)}${fmt(l.pct, 2)}%</div>
-      <div class="c-pl  ${cls(l.pct)}">${fmtUSD(l.pl)}</div>
+      <div class="c-pl  ${cls(l.pct)}">${fmtMoney(l.pl)}</div>
     `;
     restEl.appendChild(div);
   });
@@ -552,11 +568,11 @@ function render(data) {
       <div class="detail-stats">
         <div class="stat">
           <span class="stat-label">평단가</span>
-          <span class="stat-val">$${fmt(info.avg_price)}</span>
+          <span class="stat-val">${fmtPrice(info.avg_price)}</span>
         </div>
         <div class="stat">
           <span class="stat-label">현재가</span>
-          <span class="stat-val">$${fmt(cur)}</span>
+          <span class="stat-val">${fmtPrice(cur)}</span>
         </div>
         <div class="stat">
           <span class="stat-label">보유 주수</span>
@@ -564,7 +580,7 @@ function render(data) {
         </div>
         <div class="stat">
           <span class="stat-label">수익금액</span>
-          <span class="stat-val ${cls(pct)}">${fmtUSD(pl)}</span>
+          <span class="stat-val ${cls(pct)}">${fmtMoney(pl)}</span>
         </div>
       </div>
     `;
