@@ -153,7 +153,7 @@ def get_closing_price_us(ticker: str) -> tuple:
 
 def fetch_price(code: str) -> tuple:
     """장중이면 현재가, 장 마감 후면 종가를 반환.
-    반환값: (가격, 레이블) 또는 (None, None)
+    반환값: (가격, 레이블, 실제 거래일 YYYY-MM-DD) 또는 (None, None, None)
     """
     if MARKET == "KR":
         get_current, get_closing, today_label = get_current_price_kr, get_closing_price_kr, today_naver
@@ -162,13 +162,14 @@ def fetch_price(code: str) -> tuple:
 
     if is_market_open():
         price = get_current(code)
-        return (price, "현재가") if price is not None else (None, None)
+        return (price, "현재가", today) if price is not None else (None, None, None)
     else:
         price, trade_date = get_closing(code)
         if price is None:
-            return None, None
+            return None, None, None
         label = "종가" if trade_date == today_label else f"종가(기준:{trade_date})"
-        return price, label
+        trade_date_iso = trade_date.replace(".", "-") if MARKET == "KR" else trade_date
+        return price, label, trade_date_iso
 
 
 def format_price(price: float) -> str:
@@ -182,18 +183,15 @@ def main():
     print(f"\n[{today} {tz_name}] {market_name}주식 업데이트 시작 - {mode}")
     print("-" * 40)
 
-    if today not in data["prices"]:
-        data["prices"][today] = {}
-
     for pid, info in data["participants"].items():
         code = info["code"]
-        price, label = fetch_price(code)
+        price, label, trade_date = fetch_price(code)
         if price is not None:
-            data["prices"][today][pid] = price
+            data["prices"].setdefault(trade_date, {})[pid] = price
             avg = info["avg_price"]
             pct = (price - avg) / avg * 100
             sign = "+" if pct >= 0 else ""
-            print(f"  {pid} ({info['stock']}): {format_price(price)} [{label}]  수익률 {sign}{pct:.2f}%")
+            print(f"  {pid} ({info['stock']}): {format_price(price)} [{trade_date} {label}]  수익률 {sign}{pct:.2f}%")
         else:
             print(f"  {pid} ({info['stock']}): 가져오기 실패")
 
